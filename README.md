@@ -12,7 +12,7 @@ This script will iterate through the fleets you want, and migrate each of the de
 
 ### Use:
 
-Configure the following variables and run
+1. Configure the following variables
 
 - `balena_cloud_key`: The API key for the source Balena account.
 - `balena_staging_key`: The API key for the target Balena account.
@@ -25,9 +25,13 @@ Configure the following variables and run
 - `config_fields_to_migrate`: A list of configuration fields to copy from the current device configuration to the new one.
 - `device_script`: A path to the shell script that facilitates migration on individual devices.
 
-Execute
+2. Execute
 
 `python migrate_b2b.py`
+
+3. Clean
+
+The script has created some folders and files. You might want to delete them after you run the script.
 
 ### Process:
 
