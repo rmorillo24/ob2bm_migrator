@@ -22,7 +22,7 @@ else
 fi
 
 # Step 4: Loop 5 times, every minute, to check for /tmp/batton and then curl
-for i in {1..5}; do
+for i in {1..9}; do
     if [[ -f /tmp/batton ]]; then
         log "File /tmp/batton found, executing curl"
         curl -s http://example.com/api/trigger && log "Curl executed successfully"

@@ -4,7 +4,7 @@ import json
 import logging
 import subprocess
 import traceback
-
+import time
 
 import balena.exceptions
 
@@ -85,18 +85,6 @@ def migrate_devices(source_balena: balena.Balena,
                         logging.debug(f"Retreived configuration from {ip_address}: {remote_config}")
                         current_config = json.loads(remote_config)
 
-                        for field in config_fields_to_migrate:
-                            logging.debug(f"Key: {field}; old: {current_config[field]}; new: {template_data[field]}")
-                            template_data[field] = current_config[field]
-
-                        # Save modified configuration
-                        if not os.path.exists(output_config_files_folder):
-                            os.makedirs(output_config_files_folder)
-                        new_config_file=f"{output_config_files_folder}/config.json.{uuid}"
-                        with open(new_config_file, 'w') as c:
-                            json.dump(template_data, c)
-                        logging.info(f"Config file created: {new_config_file}")
-
                         # Check if device exists on target. If it already exists, skip
                         try:
                             target_device = target_balena.models.device.get_name(uuid)
@@ -104,10 +92,27 @@ def migrate_devices(source_balena: balena.Balena,
                             # Register device if not found
                             logging.info(f"Registering device {uuid} to target fleet")
                             try:
-                                target_balena.models.device.register(target_fleet_id, uuid)
+                                reg_info = target_balena.models.device.register(target_fleet_id, uuid)
+                                api_key = reg_info['api_key']
+                                logging.info(f"API key for {uuid}: {api_key}")
                             except balena.exceptions.BalenaException as e:
-                                logging.debug("Device {uuid} already exists. Skipping")
+                                logging.error("Device {uuid} already exists. Skipping")
                                 break
+
+                        # Generate config.json
+                        for field in config_fields_to_migrate:
+                            logging.debug(f"Key: {field}; old: {current_config[field]}; new: {template_data[field]}")
+                            template_data[field] = current_config[field]
+                        template_data['deviceApiKey'] = api_key
+                        key_to_modify = next(iter(template_data['deviceApiKeys']))
+                        template_data['deviceApiKeys'][key_to_modify] = api_key
+                        if not os.path.exists(output_config_files_folder):
+                            os.makedirs(output_config_files_folder)
+                        new_config_file=f"{output_config_files_folder}/config.json.{uuid}"
+                        with open(new_config_file, 'w') as c:
+                            json.dump(template_data, c)
+                        logging.info(f"Config file created: {new_config_file}")
+
 
                         # Copy modified config to device
                         try:
@@ -132,18 +137,32 @@ def migrate_devices(source_balena: balena.Balena,
                             break
                         # execute script
                         try:
-                            command = f"ssh -p 22222 -o LogLevel=ERROR root@{ip_address} 'cd /tmp; chmod u+x migrate.sh; ./migrate.sh config.json > migrate.log' < /dev/null"
+                            command = f"ssh -p 22222 -o LogLevel=ERROR root@{ip_address} 'cd /tmp; chmod u+x migrate.sh; nohup ./migrate.sh config.json > migrate.log 2>&1 < /dev/null & disown'"
                             logging.info(f"Copying: {command}")
                             result = subprocess.check_output(command, shell=True)
-                            logging.info(f"Device's config.json {uuid} copied successfully.")
+                            logging.info(f"Device's migration executing...")
                         except Exception as e:
                             logging.error(f"Error copying script file")
                             traceback.print_exc()
                             break
-                        # wait 5 minutes
-                        # check connectivity with newly migrated device
-                        # send a batonfile
 
+                        # check connectivity with newly migrated device
+                        time.sleep(300)
+                        try:
+                            new_device = target_balena.models.device.get(uuid)
+                            logging.info(f"New device info: {new_device}")
+                            if device['is_online']:
+                                ip_address = new_device['ip_address'].split()[0]
+                                command = f"ssh -p 22222 -o LogLevel=ERROR root@{ip_address} 'touch /tmp/batton'"
+                                logging.info("touching baton file in {uuid}")
+                                result = subprocess.check_output(command, shell=True)
+                                logging.info(f"Device's batton {uuid} touched successfully.")
+                        except balena.exceptions.DeviceNotFound as e:
+                            logging.error(f"Device {uuid} not found in Target. It should have been registered earlier.")
+                        except Exception as e:
+                            logging.error(f"Error while touching batton file")
+                            traceback.print_exc()
+                            break
                     else:
                         logging.info(f"Skipping device {uuid}. Offline.")
 
@@ -167,16 +186,15 @@ def migrate_devices(source_balena: balena.Balena,
 
 source_endpoint = "balena-cloud.com"
 source_api_key = os.getenv("BALENA_CLOUD_KEY")
+fleets = ["g_rafael_morillo1/tests"]
 
 target_endpoint = "balena-staging.com"
 target_api_key = os.getenv("BALENA_STAGING_KEY")
-
 target_org_owner = "g_rafael_morillo"
-fleets = ["g_rafael_morillo1/tests"]
 config_template_file = "./tests_template.config.json"
 
 output_configs_path = "./configFiles"
-config_fields_to_migrate = ["deviceApiKey", "deviceApiKeys","uuid", "deviceId"] # valid for balenaOS 2.58.6
+config_fields_to_migrate = ["uuid"] # valid for balenaOS 2.58.6
 device_script = "../device_migrate.sh"
 
 try:
