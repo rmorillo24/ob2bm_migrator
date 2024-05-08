@@ -31,7 +31,8 @@ This script will iterate through the fleets you want, and migrate each of the de
 
 3. Clean
 
-The script has created some folders and files. You might want to delete them after you run the script.
+The script has created two `.balena` folders. You need to delete them if the credentials, or the target or source servers change.
+
 
 ### Process:
 
@@ -57,11 +58,12 @@ High level, the migration process is as follows:
 
 The script `device_migrate.sh` is sent to each of the devices and will via run via SSH.
 
-Nothing has to be configured.
+This script may have to be changed depending on the environments you are using or OS verions.
 
-Te process is:
+The general process is:
 
+0. ** Backup** the current `config.json` file
 1. ** Execute `balena-os join`** 
 2. ** Check the baton file** sent by the new server
-3. ** Revert to old server** if the baton file is not there in 5 minutes.
+3. ** Revert to old server** if the baton file is not there in x minutes.
 

@@ -4,6 +4,16 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
+revert_to_backup() {
+    if os-config join "$(cat /tmp/config.json.backup)"; then
+        log "Successfully executed 'balena join config.json.backup'"
+        return 1
+    else
+        log "Could not revert to backup"
+        return 0
+    fi
+}
+
 # Step 1: Copy /mnt/boot/config.json to /tmp/config.json.backup
 if [[ -f /mnt/boot/config.json ]]; then
     cp /mnt/boot/config.json /tmp/config.json.backup
@@ -17,25 +27,26 @@ fi
 if os-config join "$(cat /tmp/config.json)"; then
     log "Successfully executed 'balena join config.json'"
 else
-    log "Error: Failed to execute 'balena join config.json'"
+    log "Error: Failed to execute 'balena join config.json'. Reverting to backup"
+    revert_to_backup
     exit 1
 fi
 
-# Step 4: Loop 5 times, every minute, to check for /tmp/batton and then curl
+# Step 4: Loop 5 times, every minute, to check for /tmp/baton and then do something
 for i in {1..9}; do
-    if [[ -f /tmp/batton ]]; then
-        log "File /tmp/batton found, executing curl"
-        curl -s http://example.com/api/trigger && log "Curl executed successfully"
+    if [[ -f /tmp/baton ]]; then
+        log "File /tmp/baton found, executing curl"
+        # e.g. curl -s http://example.com/api/trigger && log "Curl executed successfully"
         exit 0
     else
-        log "File /tmp/batton NOT found. Round $i."
+        log "File /tmp/baton NOT found. Round $i."
     fi
     sleep 60
 done
 
-# If loop completes without finding /tmp/batton, copy backup back
-if [[ ! -f /tmp/batton ]]; then
-        log "File /tmp/batton NOT found, joining back to backup"
-        os-config join "$(cat /tmp/config.json.backup)"
-        exit 0
+# If loop completes without finding /tmp/baton, copy backup back
+if [[ ! -f /tmp/baton ]]; then
+        log "File /tmp/baton NOT found, joining back to backup"
+        revert_to_backup
+        return $?
 fi
