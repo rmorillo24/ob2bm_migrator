@@ -52,7 +52,7 @@ High level, the migration process is as follows:
    - Register the device in the target fleet if necessary.
    - Copy the new `config.json` file and the migration script to the device.
    - Execute the script on the device.
-   - ** TO-DO**: send the baton file through the new server
+   - Send the baton file through the new server
 
 ## Device's script
 
